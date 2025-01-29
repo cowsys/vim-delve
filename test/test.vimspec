@@ -1,0 +1,276 @@
+Describe s:construct_current_unique_testname
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+
+        new testdata/sample_test.go
+    End
+
+    After
+        close!
+    End
+
+    It returns test name for table test
+        normal! 20G
+        let want = 'TestWithSliceTableTest/ok$'
+        let got = s:funcs.construct_current_unique_testname()
+        Assert Equals(got, want)
+    End
+    It returns test name for table test when it is in t.Run() scope
+        normal! 25G
+        let want = 'TestWithSliceTableTest/success$'
+        let got = s:funcs.construct_current_unique_testname()
+        Assert Equals(got, want)
+    End
+    It returns test name for direct test
+        normal! 46G
+        let want = 'TestWithDirectSubtest/ok$'
+        let got = s:funcs.construct_current_unique_testname()
+        Assert Equals(got, want)
+    End
+    It returns test name for direct test when it is second test case
+        normal! 56G
+        let want = 'TestWithDirectSubtest/success$'
+        let got = s:funcs.construct_current_unique_testname()
+        Assert Equals(got, want)
+    End
+End
+
+Describe s:scan_function_name
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+    End
+
+    After
+    End
+
+    It returns test name only
+        let arg = 'func TestWithDirectSubtest(t *testing.T) {'
+        let want = 'TestWithDirectSubtest'
+        let got = s:funcs.scan_function_name(arg)
+        Assert Equals(got, want)
+    End
+End
+
+Describe s:scan_subtest_name_for_tabletest
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+    End
+
+    After
+    End
+
+    It returns subtest name
+        let arg = '			name: "ok",'
+        let want = 'ok$'
+        let got = s:funcs.scan_subtest_name_for_tabletest(arg)
+        Assert Equals(got, want)
+    End
+    It returns subtest name contains space
+        let arg = '			name: "ok. the name contains space",'
+        let want = 'ok._the_name_contains_space$'
+        let got = s:funcs.scan_subtest_name_for_tabletest(arg)
+        Assert Equals(got, want)
+    End
+    It returns subtest name contains parentheses
+        let arg = '			name: "fail. getName() returns error"'
+        let want = 'fail._getName.._returns_error$'
+        let got = s:funcs.scan_subtest_name_for_tabletest(arg)
+        Assert Equals(got, want)
+    End
+End
+
+
+Describe s:scan_subtest_name_for_direct_definition
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+    End
+
+    After
+    End
+
+    It returns subtest name
+        let arg = '	t.Run("ok", func(t *testing.T) {'
+        let want = 'ok$'
+        let got = s:funcs.scan_subtest_name_for_direct_definition(arg)
+        Assert Equals(got, want)
+    End
+    It returns subtest name contains space
+        let arg = '	t.Run("ok. the name contains space", func(t *testing.T) {'
+        let want = 'ok._the_name_contains_space$'
+        let got = s:funcs.scan_subtest_name_for_direct_definition(arg)
+        Assert Equals(got, want)
+    End
+    It returns subtest name contains parentheses
+        let arg = '	t.Run("fail. getName() returns error", func(t *testing.T) {'
+        let want = 'fail._getName.._returns_error$'
+        let got = s:funcs.scan_subtest_name_for_direct_definition(arg)
+        Assert Equals(got, want)
+    End
+End
+
+Describe s:detect_subtest_format_type
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+    End
+
+    After
+    End
+
+    It detect format type slice when it is target test case
+        new testdata/sample_test.go
+        normal! 19G
+
+        let want = 1
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+    It detect format type slice when it is in r.Run() scope
+        new testdata/sample_test.go
+        normal! 25G
+
+        let want = 1
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+    It detect format type undetected when it is out of appropriate scope
+        new testdata/sample_test.go
+        normal! 9G
+
+        let want = 0
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+    It detect format type direct when it is in t.Run() scope
+        new testdata/sample_test.go
+        normal! 45G
+
+        let want = 2
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+    It detect format type undetected when it is out of t.Run() scope
+        new testdata/sample_test.go
+        normal! 11G
+
+        let want = 0
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+    It detect format type undetected when it is out of function
+        new testdata/sample_test.go
+        normal! 4G
+
+        let want = 0
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+End
+
+Describe s:detect_subtest_format_type for preparations
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+    End
+
+    After
+    End
+
+    It search for query func Test
+        new testdata/sample_test.go
+        normal! 13G
+        let got = search("func Test", "bcnW")
+        let want = 9
+        Assert Equals(got, want)
+        close!
+    End
+    It search for query name
+        new testdata/sample_test.go
+        normal! 20G
+        let got = search("name: ", "bcnW")
+        let want = 17
+        Assert Equals(got, want)
+        close!
+    End
+    It search for query t.Run
+        new testdata/sample_test.go
+        normal! 47G
+        let got = search('t.Run("', "bcnW")
+        let want = 42
+        Assert Equals(got, want)
+        close!
+    End
+End
+
+Describe s:construct_function_unique_testname
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+
+        new testdata/sample_test.go
+    End
+
+    After
+        close!
+    End
+
+    It returns test name for function
+        normal! 22G
+        let want = 'TestWithSliceTableTest$'
+        let got = s:funcs.construct_function_unique_testname()
+        Assert Equals(got, want)
+    End
+End
+
+Describe s:list_function_names
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+
+        new testdata/sample_test.go
+    End
+
+    After
+        close!
+    End
+
+    It lists all function names when it is inside of some function
+        normal! 22G
+        let want = ['TestWithSliceTableTest', 'TestWithDirectSubtest']
+        let got = s:funcs.list_function_names()
+        Assert Equals(got, want)
+    End
+End
+
+Describe s:construct_run_values
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+    End
+
+    After
+    End
+
+    It constructs run values when the number of function are several.
+        let arg = ['TestWithSliceTableTest', 'TestWithDirectSubtest']
+        let want = '"(TestWithSliceTableTest|TestWithDirectSubtest)"'
+        let got = s:funcs.construct_run_values(arg)
+        Assert Equals(got, want)
+    End
+    It construct run values when the number of function is only one
+        let arg = ['TestWithDirectSubtest']
+        let want = 'TestWithDirectSubtest'
+        let got = s:funcs.construct_run_values(arg)
+        Assert Equals(got, want)
+    End
+End
