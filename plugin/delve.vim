@@ -350,6 +350,25 @@ function! delve#dlvTestCurrent(dir, ...)
     call delve#dlvTest(a:dir, flags, "--", "--test.run", uniq_test_name)
 endfunction
 
+" dlvTestSpecifiedSubTest is calling 'dlv test' for the currently test or function
+"
+" Optional arguments:
+" flags:        flags takes custom flags to pass to dlv.
+function! delve#dlvTestSpecifiedSubTest(dir, ...)
+    let flags = ""
+    let arg= (a:0 > 0) ? join(a:000) : ""
+
+    let func_definition_lineno = search("func Test", "bcnW")
+    let func_definition_line   = getline(func_definition_lineno)
+    let function_name = s:scan_function_name(func_definition_line)
+
+    let subtest_name=substitute(arg, " ", "_", "g")
+
+    let uniq_test_name = printf('%s/%s', function_name, subtest_name)
+
+    call delve#dlvTest(a:dir, flags, "--", "--test.run", uniq_test_name)
+endfunction
+
 " dlvVersion is printing the version of dlv.
 function! delve#dlvVersion()
     !dlv version
@@ -513,7 +532,7 @@ function s:construct_current_unique_testname()
     let function_name = s:scan_function_name(func_definition_line)
 
     let subtest_format = s:detect_subtest_format_type()
-    if subtest_format == 1 " table test
+    if subtest_format == 1 " slice table test
         let subtest_definition_lineno = search("name: ", "bcnW")
         let subtest_definition_line   = getline(subtest_definition_lineno)
         let subtest_name = s:scan_subtest_name_for_tabletest(subtest_definition_line)
@@ -521,6 +540,10 @@ function s:construct_current_unique_testname()
         let subtest_definition_lineno = search('t.Run("', "bcnW")
         let subtest_definition_line   = getline(subtest_definition_lineno)
         let subtest_name = s:scan_subtest_name_for_direct_definition(subtest_definition_line)
+    elseif subtest_format == 3 " map table test
+        let subtest_definition_lineno = search('["/\w]\+: {', "bcnW")
+        let subtest_definition_line   = getline(subtest_definition_lineno)
+        let subtest_name = s:scan_subtest_name_for_map_tabletest(subtest_definition_line)
     endif
     return printf('%s/%s', function_name, subtest_name)
 endfunction
@@ -557,21 +580,40 @@ function s:scan_subtest_name_for_tabletest(line)
     return normalized_name. suffix
 endfunction
 
+function s:scan_subtest_name_for_map_tabletest(line)
+    let suffix = '$'
+    let subtest_name = split(a:line, '"')[1]
+
+    let normalized_name = substitute(subtest_name, " ", "_", "g")
+
+    " support for parentheses of fuction/method
+    let normalized_name = substitute(normalized_name, '(', ".", "g")
+    let normalized_name = substitute(normalized_name, ')', ".", "g")
+
+    return normalized_name. suffix
+endfunction
+
 " return value: Number
 " 0: failed to detect format type
 " 1: define subtest with slice
 " 2: define subtest directly
+" 3: define subtest with map
 function s:detect_subtest_format_type()
     let format_type_undetected = 0
     let format_type_slice  = 1
     let format_type_direct = 2
+    let format_type_map    = 3
 
-    let func_definition_line      = search("func Test", "bcnW")
-    let test_name_definition_line = search("name: ", "bcnW")
-    let t_run_definition_line     = search('t.Run("', "bcnW")
+    let func_definition_line          = search("func Test", "bcnW")
+    let test_name_definition_line     = search("name: ", "bcnW")
+    let map_test_name_definition_line = search('["/\w]\+: {', "bcnW")
+    let t_run_definition_line         = search('t.Run("', "bcnW")
 
     if func_definition_line < test_name_definition_line
         return format_type_slice
+    endif
+    if func_definition_line < map_test_name_definition_line
+        return format_type_map
     endif
     if func_definition_line < t_run_definition_line
         return format_type_direct
@@ -596,6 +638,7 @@ command! -nargs=* DlvTest call delve#dlvTest(expand('%:p:h'), <f-args>)
 command! -nargs=* DlvTestCurrent call delve#dlvTestCurrent(expand('%:p:h'), <f-args>)
 command! -nargs=* DlvTestCurrentFunction call delve#dlvTestCurrentFunction(expand('%:p:h'), <f-args>)
 command! -nargs=* DlvTestCurrentFile call delve#dlvTestCurrentFile(expand('%:p:h'), <f-args>)
+command! -nargs=* DlvTestSpecifiedSubTest call delve#dlvTestSpecifiedSubTest(expand('%:p:h'), <f-args>)
 command! -nargs=0 DlvToggleBreakpoint call delve#toggleBreakpoint(delve#getFile(), line('.'))
 command! -nargs=0 DlvToggleTracepoint call delve#toggleTracepoint(delve#getFile(), line('.'))
 command! -nargs=0 DlvVersion call delve#dlvVersion()

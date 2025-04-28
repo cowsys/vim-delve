@@ -10,15 +10,27 @@ Describe s:construct_current_unique_testname
         close!
     End
 
-    It returns test name for table test
+    It returns test name for slice table test
         normal! 20G
         let want = 'TestWithSliceTableTest/ok$'
         let got = s:funcs.construct_current_unique_testname()
         Assert Equals(got, want)
     End
-    It returns test name for table test when it is in t.Run() scope
+    It returns test name for slice table test when it is in t.Run() scope
         normal! 25G
         let want = 'TestWithSliceTableTest/success$'
+        let got = s:funcs.construct_current_unique_testname()
+        Assert Equals(got, want)
+    End
+    It returns test name for map table test
+        normal! 79G
+        let want = 'TestWithMapTableTest/ok$'
+        let got = s:funcs.construct_current_unique_testname()
+        Assert Equals(got, want)
+    End
+    It returns test name for map table test when it is in t.Run() scope
+        normal! 98G
+        let want = 'TestWithMapTableTest/success/with/slash/description$'
         let got = s:funcs.construct_current_unique_testname()
         Assert Equals(got, want)
     End
@@ -29,7 +41,7 @@ Describe s:construct_current_unique_testname
         Assert Equals(got, want)
     End
     It returns test name for direct test when it is second test case
-        normal! 56G
+        normal! 57G
         let want = 'TestWithDirectSubtest/success$'
         let got = s:funcs.construct_current_unique_testname()
         Assert Equals(got, want)
@@ -53,7 +65,7 @@ Describe s:scan_function_name
     End
 End
 
-Describe s:scan_subtest_name_for_tabletest
+Describe s:scan_subtest_name_for_slice_tabletest
     Before
         let s:scope = themis#helper('scope')
         let s:funcs = s:scope.funcs('/plugin/delve.vim')
@@ -82,6 +94,28 @@ Describe s:scan_subtest_name_for_tabletest
     End
 End
 
+Describe s:scan_subtest_name_for_map_tabletest
+    Before
+        let s:scope = themis#helper('scope')
+        let s:funcs = s:scope.funcs('/plugin/delve.vim')
+    End
+
+    After
+    End
+
+    It returns subtest name1
+        let arg = '		"ok": {'
+        let want = 'ok$'
+        let got = s:funcs.scan_subtest_name_for_tabletest(arg)
+        Assert Equals(got, want)
+    End
+    It returns subtest name2
+        let arg = '		"success/with/slash/description": {'
+        let want = 'success/with/slash/description$'
+        let got = s:funcs.scan_subtest_name_for_tabletest(arg)
+        Assert Equals(got, want)
+    End
+End
 
 Describe s:scan_subtest_name_for_direct_definition
     Before
@@ -132,9 +166,36 @@ Describe s:detect_subtest_format_type
     End
     It detect format type slice when it is in r.Run() scope
         new testdata/sample_test.go
-        normal! 25G
+        normal! 31G
 
         let want = 1
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+    It detect format type map when it is target test case
+        new testdata/sample_test.go
+        normal! 78G
+
+        let want = 3
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+    It detect format type map when it is target test case with slash description
+        new testdata/sample_test.go
+        normal! 89G
+
+        let want = 3
+        let got = s:funcs.detect_subtest_format_type()
+        Assert Equals(got, want)
+        close!
+    End
+    It detect format type map when it is in r.Run() scope
+        new testdata/sample_test.go
+        normal! 95G
+
+        let want = 3
         let got = s:funcs.detect_subtest_format_type()
         Assert Equals(got, want)
         close!
@@ -190,7 +251,7 @@ Describe s:detect_subtest_format_type for preparations
         new testdata/sample_test.go
         normal! 13G
         let got = search("func Test", "bcnW")
-        let want = 9
+        let want = 10
         Assert Equals(got, want)
         close!
     End
@@ -198,7 +259,7 @@ Describe s:detect_subtest_format_type for preparations
         new testdata/sample_test.go
         normal! 20G
         let got = search("name: ", "bcnW")
-        let want = 17
+        let want = 18
         Assert Equals(got, want)
         close!
     End
@@ -206,7 +267,7 @@ Describe s:detect_subtest_format_type for preparations
         new testdata/sample_test.go
         normal! 47G
         let got = search('t.Run("', "bcnW")
-        let want = 42
+        let want = 43
         Assert Equals(got, want)
         close!
     End
@@ -246,7 +307,7 @@ Describe s:list_function_names
 
     It lists all function names when it is inside of some function
         normal! 22G
-        let want = ['TestWithSliceTableTest', 'TestWithDirectSubtest']
+        let want = ['TestWithSliceTableTest', 'TestWithDirectSubtest', 'TestWithMapTableTest']
         let got = s:funcs.list_function_names()
         Assert Equals(got, want)
     End
